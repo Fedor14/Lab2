@@ -14,8 +14,8 @@ public class AppConfig {
     // Определение бина Editor
     @Bean
     @Scope("singleton")
-    public Editor editor() {
-        return new Editor();
+    public Editor editor(UndoManager undoManager) {
+        return new Editor(undoManager); // Внедряем UndoManager через конструктор
     }
 
     // Определение бина EditorUI

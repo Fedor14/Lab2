@@ -7,6 +7,7 @@ import java.io.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
+import aspect.LoggingAspect;
 
 // Объявление класса как компонента Spring
 @Component
@@ -20,10 +21,10 @@ public class Editor implements ActionListener {
 
     // Автоматическая инъекции зависимостей
     @Autowired
-    public Editor() {
+    public Editor(UndoManager undoManager) {
         this.frame = EditorUI.getFrame();   // // Получение фрейма из пользовательского интерфейса
         this.textArea = new JTextArea();
-        this.undoManager = new UndoManager();
+        this.undoManager = undoManager;
 
         // Создание меню
         JMenuBar menuBar = new JMenuBar();
@@ -91,6 +92,9 @@ public class Editor implements ActionListener {
         // Цепочка обработчиков действий
         ActionHandler handlerChain = new NewFileHandler(new OpenFileHandler(new SaveFileHandler(new SaveAsFileHandler(new CloseHandler(new ForwardHandler(new BackHandler(null)))))));
         handlerChain.handleRequest(actionCommand);
+
+        // Добавим логирование действий пользователя
+        System.out.println("Выполнено действие: " + actionCommand);
     }
 
     // Интерфейс обработчика действий
@@ -135,11 +139,15 @@ public class Editor implements ActionListener {
 
                     try {
                         BufferedReader reader = new BufferedReader(new FileReader(selectedFile));
+                        StringBuilder content = new StringBuilder();
                         String line;
                         while ((line = reader.readLine()) != null) {
-                            textArea.append(line + "\n");
+                            content.append(line).append("\n");
                         }
                         reader.close();
+
+                        // Очистка текстового поля и вставка нового содержимого
+                        textArea.setText(content.toString());
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }

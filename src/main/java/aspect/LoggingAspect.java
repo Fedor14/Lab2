@@ -1,22 +1,39 @@
 package aspect;
 
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.stereotype.Component;
 
-@Aspect // Объявление класса LoggingAspect как аспекта
+@Aspect
 @Component
 public class LoggingAspect {
 
-    // Выполняется перед вызовом метода actionPerformed в классе controller.Editor
-    @Before("execution(* controller.Editor.actionPerformed(..))")
-    public void logBeforeAction() {
-        System.out.println("Действие пользователя перехвачено.");
+    @Pointcut("execution(* controller.EditorUI.*(..))")
+    public void editorUIActions() {}
+
+    @Pointcut("execution(* controller.Editor.*(..))")
+    public void editorActions() {}
+
+    @AfterReturning("editorUIActions() && args(actionCommand)")
+    public void logUIActions(String actionCommand) {
+        switch (actionCommand) {
+            case "Open":
+                System.out.println("Файл открыт");
+                break;
+            case "Save":
+                System.out.println("Файл сохранён");
+                break;
+            default:
+                break;
+        }
     }
 
-    // Выполняется перед вызовом метода display в классе ui.EditorUI
-    @Before("execution(* ui.EditorUI.display(..))")
-    public void logBeforeDisplay() {
-        System.out.println("Пользовательский интерфейс отображается.");
+    @AfterReturning("editorActions() && args(actionCommand)")
+    public void logEditorActions(String actionCommand) {
+        switch (actionCommand) {
+            default:
+                break;
+        }
     }
 }
