@@ -1,14 +1,12 @@
+import config.AppConfig;
 import controller.Editor;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 public class TextEditorApplication {
-
     public static void main(String[] args) {
-
-        // Создание контекста Spring и загрузка конфигурации из XML-файла "applicationContext.xml"
-        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
-        // Получение бина класса Editor
+        // Использование конфигурации на основе Java
+        ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
         Editor editor = context.getBean(Editor.class);
     }
 }

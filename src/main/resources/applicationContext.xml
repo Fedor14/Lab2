@@ -13,8 +13,18 @@
     <!-- Определение бина для EditorUI -->
     <bean id="editorUI" class="ui.EditorUI" />
 
+    <!-- Определение бина для Editor -->
+    <bean id="editor" class="controller.Editor">
+        <!-- Внедрение зависимостей -->
+        <constructor-arg ref="editorUI" />
+        <constructor-arg ref="undoManager" />
+    </bean>
+
     <!-- Определение бина для UndoManager -->
     <bean id="undoManager" class="javax.swing.undo.UndoManager" scope="singleton" />
+
+    <!-- Определение бина для LoggingAspect -->
+    <bean id="loggingAspect" class="aspect.LoggingAspect" />
 
     <!-- Включение поддержки аспектов -->
     <aop:aspectj-autoproxy />

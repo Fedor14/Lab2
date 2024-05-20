@@ -7,7 +7,6 @@ import java.io.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
-import aspect.LoggingAspect;
 
 // Объявление класса как компонента Spring
 @Component
@@ -19,10 +18,10 @@ public class Editor implements ActionListener {
 
     private UndoManager undoManager;
 
-    // Автоматическая инъекции зависимостей
+    // Автоматическая инъекция зависимостей
     @Autowired
-    public Editor(UndoManager undoManager) {
-        this.frame = EditorUI.getFrame();   // // Получение фрейма из пользовательского интерфейса
+    public Editor(EditorUI editorUI, UndoManager undoManager) {
+        this.frame = EditorUI.getFrame();   // Получение фрейма из пользовательского интерфейса
         this.textArea = new JTextArea();
         this.undoManager = undoManager;
 
@@ -68,9 +67,8 @@ public class Editor implements ActionListener {
         textArea.getDocument().addUndoableEditListener(undoManager);
 
         // Пользовательский интерфейс
-        EditorUI.display();
+        editorUI.display();
     }
-
     // Установка команд действий для пунктов меню
     private void setActionCommands(JMenuItem... items) {
         for (JMenuItem item : items) {
