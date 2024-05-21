@@ -15,8 +15,8 @@ public class LoggingAspect {
     @Pointcut("execution(* controller.Editor.*(..))")
     public void editorActions() {}
 
-    @AfterReturning("editorUIActions() && args(actionCommand)")
-    public void logUIActions(String actionCommand) {
+    @AfterReturning(pointcut = "editorActions() && args(actionCommand)", returning = "actionCommand")
+    public void logEditorActions(String actionCommand) {
         switch (actionCommand) {
             case "Open":
                 System.out.println("Файл открыт");
@@ -24,14 +24,6 @@ public class LoggingAspect {
             case "Save":
                 System.out.println("Файл сохранён");
                 break;
-            default:
-                break;
-        }
-    }
-
-    @AfterReturning("editorActions() && args(actionCommand)")
-    public void logEditorActions(String actionCommand) {
-        switch (actionCommand) {
             default:
                 break;
         }

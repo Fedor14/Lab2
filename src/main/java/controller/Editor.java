@@ -4,33 +4,34 @@ import javax.swing.*;
 import javax.swing.undo.UndoManager;
 import java.awt.event.*;
 import java.io.*;
+
+import aspect.LoggingAspect;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
 
-// Объявление класса как компонента Spring
 @Component
 public class Editor implements ActionListener {
 
     private JTextArea textArea;
     private JFrame frame;
-    private File openedFile = null; // Хранит открытый файл, если он есть
+    private File openedFile = null;
 
     private UndoManager undoManager;
 
-    // Автоматическая инъекция зависимостей
+    @Autowired
+    private LoggingAspect loggingAspect;
+
     @Autowired
     public Editor(EditorUI editorUI, UndoManager undoManager) {
-        this.frame = EditorUI.getFrame();   // Получение фрейма из пользовательского интерфейса
+        this.frame = EditorUI.getFrame();
         this.textArea = new JTextArea();
         this.undoManager = undoManager;
 
-        // Создание меню
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
         JMenu editMenu = new JMenu("Correction");
 
-        // Создание пунктов меню
         JMenuItem newMenuItem = new JMenuItem("New");
         JMenuItem openMenuItem = new JMenuItem("Open");
         JMenuItem saveMenuItem = new JMenuItem("Save");
@@ -40,13 +41,9 @@ public class Editor implements ActionListener {
         JMenuItem forwardMenuItem = new JMenuItem("Previous");
         JMenuItem backMenuItem = new JMenuItem("Following");
 
-        // Установка команд действий для пунктов меню
         setActionCommands(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem);
-
-        // Добавление обработчиков действий к пунктам меню
         addActionListeners(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem);
 
-        // Добавление пунктов меню в меню
         fileMenu.add(newMenuItem);
         fileMenu.add(openMenuItem);
         fileMenu.add(saveMenuItem);
@@ -55,52 +52,44 @@ public class Editor implements ActionListener {
         editMenu.add(forwardMenuItem);
         editMenu.add(backMenuItem);
 
-        // Добавление пунктов меню в меню
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
 
-        // Установка меню бара для фрейма
         frame.setJMenuBar(menuBar);
         frame.add(textArea);
 
-        // Добавление слушателя отмены изменений в текстовое поле
         textArea.getDocument().addUndoableEditListener(undoManager);
-
-        // Пользовательский интерфейс
         editorUI.display();
     }
-    // Установка команд действий для пунктов меню
+
     private void setActionCommands(JMenuItem... items) {
         for (JMenuItem item : items) {
             item.setActionCommand(item.getText());
         }
     }
 
-    // Обработчики действий
     private void addActionListeners(JMenuItem... items) {
         for (JMenuItem item : items) {
             item.addActionListener(this);
         }
     }
 
-    // Выполнение действия
     public void actionPerformed(ActionEvent e) {
         String actionCommand = e.getActionCommand();
 
-        // Цепочка обработчиков действий
         ActionHandler handlerChain = new NewFileHandler(new OpenFileHandler(new SaveFileHandler(new SaveAsFileHandler(new CloseHandler(new ForwardHandler(new BackHandler(null)))))));
         handlerChain.handleRequest(actionCommand);
 
-        // Добавим логирование действий пользователя
+        // Используем самовнедренный бин для вызова метода логирования
+        this.loggingAspect.logEditorActions(actionCommand);
+
         System.out.println("Выполнено действие: " + actionCommand);
     }
 
-    // Интерфейс обработчика действий
     interface ActionHandler {
         void handleRequest(String actionCommand);
     }
 
-    // Обработчик для создания нового файла
     class NewFileHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -118,7 +107,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Обработчик для открытия файла
     class OpenFileHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -144,7 +132,6 @@ public class Editor implements ActionListener {
                         }
                         reader.close();
 
-                        // Очистка текстового поля и вставка нового содержимого
                         textArea.setText(content.toString());
                     } catch (IOException ex) {
                         ex.printStackTrace();
@@ -156,7 +143,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Обработчик для сохранения файла
     class SaveFileHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -201,7 +187,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Обработчик для сохранения файла под новым именем
     class SaveAsFileHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -232,7 +217,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Обработчик для закрытия редактора
     class CloseHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -249,7 +233,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Мотаем назад
     class ForwardHandler implements ActionHandler {
         private ActionHandler next;
 
@@ -268,7 +251,6 @@ public class Editor implements ActionListener {
         }
     }
 
-    // Мотаем вперёд
     class BackHandler implements ActionHandler {
         private ActionHandler next;
 
