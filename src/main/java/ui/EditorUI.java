@@ -32,4 +32,3 @@ public class EditorUI {
         frame.setVisible(true);
     }
 }
-

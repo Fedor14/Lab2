@@ -7,7 +7,6 @@ import java.io.*;
 
 import aspect.LoggingAspect;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
 
@@ -270,5 +269,3 @@ public class Editor implements ActionListener {
         }
     }
 }
-
-

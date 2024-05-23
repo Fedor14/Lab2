@@ -11,4 +11,3 @@ public class TextEditorApplication {
         Editor editor2 = context.getBean(Editor.class);
     }
 }
-
