@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class EditorUI {
     // Основное окно
-    private static JFrame frame;
+    private JFrame frame;
 
     public EditorUI() {
         // Создание окна
@@ -23,12 +23,13 @@ public class EditorUI {
         }
     }
 
-    public static JFrame getFrame() {
+    public JFrame getFrame() {
         return frame;
     }
 
-    public static void display() {
+    public void display() {
         frame.setSize(500, 500);
         frame.setVisible(true);
     }
 }
+
