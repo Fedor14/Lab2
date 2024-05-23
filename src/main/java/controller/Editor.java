@@ -2,13 +2,21 @@ package controller;
 
 import javax.swing.*;
 import javax.swing.undo.UndoManager;
-import java.awt.event.*;
 import java.io.*;
 
 import aspect.LoggingAspect;
+import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
+
+import observer.EditorObserver;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import java.util.ArrayList;
+import java.util.List;
+import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
 
 @Component
 public class Editor implements ActionListener {
@@ -19,14 +27,19 @@ public class Editor implements ActionListener {
 
     private UndoManager undoManager;
 
+    private List<EditorObserver> observers = new ArrayList<>();
+
+    private boolean isUpdating = false;
+
     @Autowired
     private LoggingAspect loggingAspect;
 
     @Autowired
-    public Editor(EditorUI editorUI, UndoManager undoManager) {
+    public Editor(EditorUI editorUI, UndoManager undoManager, LoggingAspect loggingAspect) {
         this.frame = editorUI.getFrame();
         this.textArea = new JTextArea();
         this.undoManager = undoManager;
+        this.loggingAspect = loggingAspect;
 
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
@@ -59,7 +72,51 @@ public class Editor implements ActionListener {
         frame.add(textArea);
 
         textArea.getDocument().addUndoableEditListener(undoManager);
+        //textArea.getDocument().addUndoableEditListener(undoManager);
+        textArea.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) {
+                if (!isUpdating) {
+                    notifyObservers();
+                }
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                if (!isUpdating) {
+                    notifyObservers();
+                }
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                if (!isUpdating) {
+                    notifyObservers();
+                }
+            }
+        });
         editorUI.display();
+    }
+
+    public void addObserver(EditorObserver observer) {
+        observers.add(observer);
+    }
+
+    public void removeObserver(EditorObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers() {
+        String text = textArea.getText();
+        for (EditorObserver observer : observers) {
+            observer.update(text);
+        }
+    }
+
+    public void setText(String text) {
+        isUpdating = true;
+        try {
+            textArea.setText(text);
+        } finally {
+            isUpdating = false;
+        }
     }
 
     private void setActionCommands(JMenuItem... items) {
