@@ -3,9 +3,10 @@ package controller;
 import javax.swing.*;
 import javax.swing.undo.UndoManager;
 import java.io.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import aspect.LoggingAspect;
-import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ui.EditorUI;
@@ -33,6 +34,10 @@ public class Editor implements ActionListener {
 
     @Autowired
     private LoggingAspect loggingAspect;
+
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock readLock = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
 
     @Autowired
     public Editor(EditorUI editorUI, UndoManager undoManager, LoggingAspect loggingAspect) {
@@ -72,7 +77,6 @@ public class Editor implements ActionListener {
         frame.add(textArea);
 
         textArea.getDocument().addUndoableEditListener(undoManager);
-        //textArea.getDocument().addUndoableEditListener(undoManager);
         textArea.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
                 if (!isUpdating) {
@@ -96,26 +100,46 @@ public class Editor implements ActionListener {
     }
 
     public void addObserver(EditorObserver observer) {
-        observers.add(observer);
+        writeLock.lock();
+        try {
+            observers.add(observer);
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     public void removeObserver(EditorObserver observer) {
-        observers.remove(observer);
+        writeLock.lock();
+        try {
+            observers.remove(observer);
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     private void notifyObservers() {
-        String text = textArea.getText();
-        for (EditorObserver observer : observers) {
-            observer.update(text);
+        readLock.lock();
+        try {
+            String text = textArea.getText();
+            for (EditorObserver observer : observers) {
+                observer.update(text);
+            }
+        } finally {
+            readLock.unlock();
         }
     }
 
     public void setText(String text) {
-        isUpdating = true;
+        writeLock.lock();
         try {
-            textArea.setText(text);
+            isUpdating = true;
+            try {
+                textArea.setText(text);
+            } finally {
+                isUpdating = false;
+            }
         } finally {
-            isUpdating = false;
+            writeLock.unlock();
         }
     }
 
@@ -156,8 +180,13 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("New")) {
-                textArea.setText("");
-                openedFile = null;
+                writeLock.lock();
+                try {
+                    textArea.setText("");
+                    openedFile = null;
+                } finally {
+                    writeLock.unlock();
+                }
             } else {
                 next.handleRequest(actionCommand);
             }
@@ -178,9 +207,10 @@ public class Editor implements ActionListener {
 
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
                     File selectedFile = fileChooser.getSelectedFile();
-                    openedFile = selectedFile;
-
+                    writeLock.lock();
                     try {
+                        openedFile = selectedFile;
+
                         BufferedReader reader = new BufferedReader(new FileReader(selectedFile));
                         StringBuilder content = new StringBuilder();
                         String line;
@@ -192,6 +222,8 @@ public class Editor implements ActionListener {
                         textArea.setText(content.toString());
                     } catch (IOException ex) {
                         ex.printStackTrace();
+                    } finally {
+                        writeLock.unlock();
                     }
                 }
             } else {
@@ -216,30 +248,35 @@ public class Editor implements ActionListener {
         }
 
         private void saveFile() {
-            if (openedFile != null) {
-                try {
-                    FileWriter writer = new FileWriter(openedFile);
-                    writer.write(textArea.getText());
-                    writer.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            } else {
-                JFileChooser fileChooser = new JFileChooser();
-                int returnValue = fileChooser.showSaveDialog(frame);
-
-                if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    openedFile = selectedFile;
-
+            writeLock.lock();
+            try {
+                if (openedFile != null) {
                     try {
-                        FileWriter writer = new FileWriter(selectedFile);
+                        FileWriter writer = new FileWriter(openedFile);
                         writer.write(textArea.getText());
                         writer.close();
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
+                } else {
+                    JFileChooser fileChooser = new JFileChooser();
+                    int returnValue = fileChooser.showSaveDialog(frame);
+
+                    if (returnValue == JFileChooser.APPROVE_OPTION) {
+                        File selectedFile = fileChooser.getSelectedFile();
+                        openedFile = selectedFile;
+
+                        try {
+                            FileWriter writer = new FileWriter(selectedFile);
+                            writer.write(textArea.getText());
+                            writer.close();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
                 }
+            } finally {
+                writeLock.unlock();
             }
         }
     }
@@ -253,20 +290,25 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Save as")) {
-                JFileChooser fileChooser = new JFileChooser();
-                int returnValue = fileChooser.showSaveDialog(frame);
+                writeLock.lock();
+                try {
+                    JFileChooser fileChooser = new JFileChooser();
+                    int returnValue = fileChooser.showSaveDialog(frame);
 
-                if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    openedFile = selectedFile;
+                    if (returnValue == JFileChooser.APPROVE_OPTION) {
+                        File selectedFile = fileChooser.getSelectedFile();
+                        openedFile = selectedFile;
 
-                    try {
-                        FileWriter writer = new FileWriter(selectedFile);
-                        writer.write(textArea.getText());
-                        writer.close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
+                        try {
+                            FileWriter writer = new FileWriter(selectedFile);
+                            writer.write(textArea.getText());
+                            writer.close();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
                     }
+                } finally {
+                    writeLock.unlock();
                 }
             } else {
                 next.handleRequest(actionCommand);
@@ -283,7 +325,12 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Close")) {
-                frame.dispose();
+                writeLock.lock();
+                try {
+                    frame.dispose();
+                } finally {
+                    writeLock.unlock();
+                }
             } else {
                 next.handleRequest(actionCommand);
             }
@@ -299,8 +346,13 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Previous")) {
-                if (undoManager.canUndo()) {
-                    undoManager.undo();
+                readLock.lock();
+                try {
+                    if (undoManager.canUndo()) {
+                        undoManager.undo();
+                    }
+                } finally {
+                    readLock.unlock();
                 }
             } else {
                 next.handleRequest(actionCommand);
@@ -317,8 +369,13 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Following")) {
-                if (undoManager.canRedo()) {
-                    undoManager.redo();
+                readLock.lock();
+                try {
+                    if (undoManager.canRedo()) {
+                        undoManager.redo();
+                    }
+                } finally {
+                    readLock.unlock();
                 }
             } else {
                 next.handleRequest(actionCommand);

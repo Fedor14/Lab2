@@ -15,10 +15,10 @@ public class TextEditorApplication {
         EditorUI editorUI1 = context.getBean(EditorUI.class);
         EditorUI editorUI2 = context.getBean(EditorUI.class);
         UndoManager undoManager = context.getBean(UndoManager.class);
-        LoggingAspect loggingAspect = context.getBean(LoggingAspect.class); // Добавлено
+        LoggingAspect loggingAspect = context.getBean(LoggingAspect.class);
 
-        Editor editor1 = new Editor(editorUI1, undoManager, loggingAspect); // Изменено
-        Editor editor2 = new Editor(editorUI2, undoManager, loggingAspect); // Изменено
+        Editor editor1 = new Editor(editorUI1, undoManager, loggingAspect);
+        Editor editor2 = new Editor(editorUI2, undoManager, loggingAspect);
 
         TextEditorObserver observer1 = new TextEditorObserver(editor2);
         TextEditorObserver observer2 = new TextEditorObserver(editor1);
