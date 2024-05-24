@@ -346,13 +346,8 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Previous")) {
-                readLock.lock();
-                try {
-                    if (undoManager.canUndo()) {
-                        undoManager.undo();
-                    }
-                } finally {
-                    readLock.unlock();
+                if (undoManager.canUndo()) {
+                    undoManager.undo();
                 }
             } else {
                 next.handleRequest(actionCommand);
@@ -369,13 +364,8 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Following")) {
-                readLock.lock();
-                try {
-                    if (undoManager.canRedo()) {
-                        undoManager.redo();
-                    }
-                } finally {
-                    readLock.unlock();
+                if (undoManager.canRedo()) {
+                    undoManager.redo();
                 }
             } else {
                 next.handleRequest(actionCommand);
