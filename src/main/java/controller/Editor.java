@@ -32,6 +32,8 @@ public class Editor implements ActionListener {
 
     private boolean isUpdating = false;
 
+    private String previousState;
+
     @Autowired
     private LoggingAspect loggingAspect;
 
@@ -103,15 +105,6 @@ public class Editor implements ActionListener {
         writeLock.lock();
         try {
             observers.add(observer);
-        } finally {
-            writeLock.unlock();
-        }
-    }
-
-    public void removeObserver(EditorObserver observer) {
-        writeLock.lock();
-        try {
-            observers.remove(observer);
         } finally {
             writeLock.unlock();
         }
@@ -347,6 +340,8 @@ public class Editor implements ActionListener {
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Previous")) {
                 if (undoManager.canUndo()) {
+                    // Сохраняем текущее состояние перед отменой действия
+                    previousState = textArea.getText();
                     undoManager.undo();
                 }
             } else {
@@ -364,8 +359,9 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Following")) {
-                if (undoManager.canRedo()) {
-                    undoManager.redo();
+                // Восстанавливаем сохраненное состояние при выполнении действия "Following"
+                if (previousState != null) {
+                    textArea.setText(previousState);
                 }
             } else {
                 next.handleRequest(actionCommand);
