@@ -335,7 +335,7 @@ public class Editor implements ActionListener {
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Previous")) {
                 if (undoManager.canUndo()) {
-                    //previousState = textArea.getText(); // Сохранение текущего состояния текста перед отменой
+                    previousState = textArea.getText(); // Сохранение текущего состояния текста перед отменой
                     undoManager.undo(); // Отмена последнего действия
                 }
             } else {
