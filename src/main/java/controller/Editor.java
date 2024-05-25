@@ -3,8 +3,6 @@ package controller;
 import javax.swing.*;
 import javax.swing.undo.UndoManager;
 import java.io.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import aspect.LoggingAspect;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,36 +17,41 @@ import java.util.List;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 
-@Component // Указывает, что этот класс является Spring-компонентом
+@Component
 public class Editor implements ActionListener {
 
-    private JTextArea textArea; // Текстовое поле для ввода текста
-    private JFrame frame; // Основное окно приложения
-    private File openedFile = null; // Ссылка на открытый файл
+    private JTextArea textArea;
+    private JFrame frame;
+    private File openedFile = null;
 
-    private UndoManager undoManager; // Менеджер отмены и повтора действий
+    private UndoManager undoManager;
 
-    private List<EditorObserver> observers = new ArrayList<>(); // Список наблюдателей
+    private List<EditorObserver> observers = new ArrayList<>();
 
-    private boolean isUpdating = false; // Флаг, указывающий, происходит ли обновление текста
+    private boolean isUpdating = false;
 
-    private String previousState; // Предыдущее состояние текста для функции "Following"
+    private String previousState;
 
-    @Autowired // Автоматическое внедрение зависимости
+    @Autowired
     private LoggingAspect loggingAspect;
 
-    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(); // Замок для обеспечения потокобезопасности
-    private final Lock readLock = rwLock.readLock(); // Замок для чтения
-    private final Lock writeLock = rwLock.writeLock(); // Замок для записи
+    private final SimpleMutex mutex = new SimpleMutex();
+
+    private void acquireLock() throws InterruptedException {
+        mutex.lock();
+    }
+
+    private void releaseLock() {
+        mutex.unlock();
+    }
 
     @Autowired
     public Editor(EditorUI editorUI, UndoManager undoManager, LoggingAspect loggingAspect) {
-        this.frame = editorUI.getFrame(); // Получение окна от EditorUI
-        this.textArea = new JTextArea(); // Создание текстового поля
-        this.undoManager = undoManager; // Инициализация UndoManager
-        this.loggingAspect = loggingAspect; // Инициализация LoggingAspect
+        this.frame = editorUI.getFrame();
+        this.textArea = new JTextArea();
+        this.undoManager = undoManager;
+        this.loggingAspect = loggingAspect;
 
-        // Создание меню
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
         JMenu editMenu = new JMenu("Correction");
@@ -62,8 +65,8 @@ public class Editor implements ActionListener {
         JMenuItem forwardMenuItem = new JMenuItem("Previous");
         JMenuItem backMenuItem = new JMenuItem("Following");
 
-        setActionCommands(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem); // Установка команд действий для пунктов меню
-        addActionListeners(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem); // Добавление обработчиков событий для пунктов меню
+        setActionCommands(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem);
+        addActionListeners(newMenuItem, openMenuItem, saveMenuItem, saveAsMenuItem, closeMenuItem, forwardMenuItem, backMenuItem);
 
         fileMenu.add(newMenuItem);
         fileMenu.add(openMenuItem);
@@ -76,93 +79,99 @@ public class Editor implements ActionListener {
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
 
-        frame.setJMenuBar(menuBar); // Установка панели меню для окна
-        frame.add(textArea); // Добавление текстового поля в окно
+        frame.setJMenuBar(menuBar);
+        frame.add(textArea);
 
-        textArea.getDocument().addUndoableEditListener(undoManager); // Добавление слушателя изменений текста для UndoManager
+        textArea.getDocument().addUndoableEditListener(undoManager);
         textArea.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
                 if (!isUpdating) {
-                    notifyObservers(); // Уведомление наблюдателей при вставке текста
+                    notifyObservers();
                 }
             }
 
             public void removeUpdate(DocumentEvent e) {
                 if (!isUpdating) {
-                    notifyObservers(); // Уведомление наблюдателей при удалении текста
+                    notifyObservers();
                 }
             }
 
             public void changedUpdate(DocumentEvent e) {
                 if (!isUpdating) {
-                    notifyObservers(); // Уведомление наблюдателей при изменении текста
+                    notifyObservers();
                 }
             }
         });
-        editorUI.display(); // Отображение окна
+        editorUI.display();
     }
 
     public void addObserver(EditorObserver observer) {
-        writeLock.lock(); // Захват замка для записи
         try {
-            observers.add(observer); // Добавление наблюдателя
+            acquireLock();
+            observers.add(observer);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         } finally {
-            writeLock.unlock(); // Освобождение замка
+            releaseLock();
         }
     }
 
     private void notifyObservers() {
-        readLock.lock(); // Захват замка для чтения
         try {
-            String text = textArea.getText(); // Получение текста из текстового поля
+            acquireLock();
+            String text = textArea.getText();
             for (EditorObserver observer : observers) {
-                observer.update(text); // Уведомление наблюдателя
+                observer.update(text);
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         } finally {
-            readLock.unlock(); // Освобождение замка
+            releaseLock();
         }
     }
 
     public void setText(String text) {
-        writeLock.lock(); // Захват замка для записи
         try {
-            isUpdating = true; // Установка флага, что происходит обновление текста
+            acquireLock();
+            isUpdating = true;
             try {
-                textArea.setText(text); // Установка текста в текстовое поле
+                textArea.setText(text);
             } finally {
-                isUpdating = false; // Сброс флага
+                isUpdating = false;
             }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         } finally {
-            writeLock.unlock(); // Освобождение замка
+            releaseLock();
         }
     }
 
     private void setActionCommands(JMenuItem... items) {
         for (JMenuItem item : items) {
-            item.setActionCommand(item.getText()); // Установка команды действия для каждого пункта меню
+            item.setActionCommand(item.getText());
         }
     }
 
     private void addActionListeners(JMenuItem... items) {
         for (JMenuItem item : items) {
-            item.addActionListener(this); // Добавление обработчика событий для каждого пункта меню
+            item.addActionListener(this);
         }
     }
 
     public void actionPerformed(ActionEvent e) {
-        String actionCommand = e.getActionCommand(); // Получение команды действия
+        String actionCommand = e.getActionCommand();
 
-        // Цепочка обязанностей для обработки команд действий
         ActionHandler handlerChain = new NewFileHandler(new OpenFileHandler(new SaveFileHandler(new SaveAsFileHandler(new CloseHandler(new ForwardHandler(new BackHandler(null)))))));
-        handlerChain.handleRequest(actionCommand); // Обработка команды через цепочку обязанностей
+        handlerChain.handleRequest(actionCommand);
 
-        this.loggingAspect.logEditorActions(actionCommand); // Вызов метода логирования действия
+        // Use self-injected bean to call logging method
+        this.loggingAspect.logEditorActions(actionCommand);
 
-        System.out.println("Выполнено действие: " + actionCommand);
+        System.out.println("Action performed: " + actionCommand);
     }
 
     interface ActionHandler {
-        void handleRequest(String actionCommand); // Интерфейс для обработчиков команд
+        void handleRequest(String actionCommand);
     }
 
     class NewFileHandler implements ActionHandler {
@@ -174,15 +183,19 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("New")) {
-                writeLock.lock(); // Захват замка для записи
-                try {
-                    textArea.setText(""); // Очистка текстового поля
-                    openedFile = null; // Сброс ссылки на открытый файл
-                } finally {
-                    writeLock.unlock(); // Освобождение замка
-                }
+                new Thread(() -> {
+                    try {
+                        acquireLock();
+                        textArea.setText("");
+                        openedFile = null;
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        releaseLock();
+                    }
+                }).start();
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
     }
@@ -197,28 +210,33 @@ public class Editor implements ActionListener {
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Open")) {
                 JFileChooser fileChooser = new JFileChooser();
-                int returnValue = fileChooser.showOpenDialog(frame); // Открытие диалогового окна для выбора файла
+                int returnValue = fileChooser.showOpenDialog(frame);
 
                 if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile(); // Получение выбранного файла
-                    writeLock.lock(); // Захват замка для записи
-                    try {
-                        openedFile = selectedFile;
+                    File selectedFile = fileChooser.getSelectedFile();
 
-                        BufferedReader reader = new BufferedReader(new FileReader(selectedFile));
-                        StringBuilder content = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            content.append(line).append("\n"); // Чтение содержимого файла
+                    // Чтение файла в отдельном потоке
+                    new Thread(() -> {
+                        try {
+                            acquireLock();
+                            openedFile = selectedFile;
+
+                            BufferedReader reader = new BufferedReader(new FileReader(selectedFile));
+                            StringBuilder content = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                content.append(line).append("\n");
+                            }
+                            reader.close();
+
+                            // Обновляем текстовое поле в главном потоке через Event Dispatch Thread
+                            SwingUtilities.invokeLater(() -> textArea.setText(content.toString()));
+                        } catch (IOException | InterruptedException ex) {
+                            ex.printStackTrace();
+                        } finally {
+                            releaseLock();
                         }
-                        reader.close();
-
-                        textArea.setText(content.toString()); // Установка содержимого файла в текстовое поле
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    } finally {
-                        writeLock.unlock(); // Освобождение замка
-                    }
+                    }).start();
                 }
             } else {
                 next.handleRequest(actionCommand);
@@ -235,38 +253,46 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Save")) {
-                saveFile(); // Вызов метода сохранения файла
+                new Thread(() -> {
+                    try {
+                        acquireLock();
+                        saveFile();
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        releaseLock();
+                    }
+                }).start();
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
 
         private void saveFile() {
-            writeLock.lock(); // Захват замка для записи
-            try {
-                if (openedFile != null) {
-                    try (FileWriter writer = new FileWriter(openedFile)) {
-                        writer.write(textArea.getText()); // Запись содержимого текстового поля в файл
+            if (openedFile != null) {
+                try {
+                    FileWriter writer = new FileWriter(openedFile);
+                    writer.write(textArea.getText());
+                    writer.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            } else {
+                JFileChooser fileChooser = new JFileChooser();
+                int returnValue = fileChooser.showSaveDialog(frame);
+
+                if (returnValue == JFileChooser.APPROVE_OPTION) {
+                    File selectedFile = fileChooser.getSelectedFile();
+                    openedFile = selectedFile;
+
+                    try {
+                        FileWriter writer = new FileWriter(selectedFile);
+                        writer.write(textArea.getText());
+                        writer.close();
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
-                } else {
-                    JFileChooser fileChooser = new JFileChooser();
-                    int returnValue = fileChooser.showSaveDialog(frame); // Открытие диалогового окна для сохранения файла
-
-                    if (returnValue == JFileChooser.APPROVE_OPTION) {
-                        File selectedFile = fileChooser.getSelectedFile();
-                        openedFile = selectedFile;
-
-                        try (FileWriter writer = new FileWriter(selectedFile)) {
-                            writer.write(textArea.getText()); // Запись содержимого текстового поля в файл
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
                 }
-            } finally {
-                writeLock.unlock(); // Освобождение замка
             }
         }
     }
@@ -280,26 +306,32 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Save as")) {
-                writeLock.lock(); // Захват замка для записи
-                try {
-                    JFileChooser fileChooser = new JFileChooser();
-                    int returnValue = fileChooser.showSaveDialog(frame); // Открытие диалогового окна для сохранения файла
+                new Thread(() -> {
+                    try {
+                        acquireLock();
+                        JFileChooser fileChooser = new JFileChooser();
+                        int returnValue = fileChooser.showSaveDialog(frame);
 
-                    if (returnValue == JFileChooser.APPROVE_OPTION) {
-                        File selectedFile = fileChooser.getSelectedFile();
-                        openedFile = selectedFile;
+                        if (returnValue == JFileChooser.APPROVE_OPTION) {
+                            File selectedFile = fileChooser.getSelectedFile();
+                            openedFile = selectedFile;
 
-                        try (FileWriter writer = new FileWriter(selectedFile)) {
-                            writer.write(textArea.getText()); // Запись содержимого текстового поля в файл
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
+                            try {
+                                FileWriter writer = new FileWriter(selectedFile);
+                                writer.write(textArea.getText());
+                                writer.close();
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
                         }
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        releaseLock();
                     }
-                } finally {
-                    writeLock.unlock(); // Освобождение замка
-                }
+                }).start();
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
     }
@@ -313,14 +345,18 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Close")) {
-                writeLock.lock(); // Захват замка для записи
-                try {
-                    frame.dispose(); // Закрытие окна
-                } finally {
-                    writeLock.unlock(); // Освобождение замка
-                }
+                new Thread(() -> {
+                    try {
+                        acquireLock();
+                        frame.dispose();
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        releaseLock();
+                    }
+                }).start();
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
     }
@@ -334,12 +370,10 @@ public class Editor implements ActionListener {
 
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Previous")) {
-                if (undoManager.canUndo()) {
-                    previousState = textArea.getText(); // Сохранение текущего состояния текста перед отменой
-                    undoManager.undo(); // Отмена последнего действия
-                }
+                previousState = textArea.getText();
+                SwingUtilities.invokeLater(() -> undoManager.undo()); // Выполнение в основном потоке Swing
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
     }
@@ -354,10 +388,10 @@ public class Editor implements ActionListener {
         public void handleRequest(String actionCommand) {
             if (actionCommand.equals("Following")) {
                 if (previousState != null) {
-                    textArea.setText(previousState); // Восстановление сохраненного состояния текста
+                    textArea.setText(previousState);
                 }
             } else {
-                next.handleRequest(actionCommand); // Передача команды следующему обработчику
+                next.handleRequest(actionCommand);
             }
         }
     }
