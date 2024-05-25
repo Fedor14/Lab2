@@ -20,28 +20,28 @@ import java.awt.event.ActionEvent;
 @Component
 public class Editor implements ActionListener {
 
-    private JTextArea textArea;  // Текстовая область для ввода текста
-    private JFrame frame;  // Основное окно приложения
-    private File openedFile = null;  // Текущий открытый файл, если есть
+    public JTextArea textArea;  // Текстовая область для ввода текста
+    public JFrame frame;  // Основное окно приложения
+    public File openedFile = null;  // Текущий открытый файл, если есть
 
-    private UndoManager undoManager;  // Менеджер отмены действий для текстовой области
+    public UndoManager undoManager;  // Менеджер отмены действий для текстовой области
 
-    private List<EditorObserver> observers = new ArrayList<>();  // Список наблюдателей, которые будут уведомлены об изменениях текста
+    public List<EditorObserver> observers = new ArrayList<>();  // Список наблюдателей, которые будут уведомлены об изменениях текста
 
-    private boolean isUpdating = false;  // Флаг для предотвращения рекурсивных вызовов при обновлении текста
+    public boolean isUpdating = false;  // Флаг для предотвращения рекурсивных вызовов при обновлении текста
 
-    private String previousState;  // Предыдущее состояние текста, используется для функции отмены
+    public String previousState;  // Предыдущее состояние текста, используется для функции отмены
 
     @Autowired
-    private LoggingAspect loggingAspect;  // Логирования действий
+    public LoggingAspect loggingAspect;  // Логирования действий
 
-    private final SimpleMutex mutex = new SimpleMutex();  // Мьютекс для синхронизации доступа
+    public final SimpleMutex mutex = new SimpleMutex();  // Мьютекс для синхронизации доступа
 
-    private void acquireLock() throws InterruptedException {  // Метод для получения блокировки
+    public void acquireLock() throws InterruptedException {  // Метод для получения блокировки
         mutex.lock();
     }
 
-    private void releaseLock() {  // Метод для освобождения блокировки
+    public void releaseLock() {  // Метод для освобождения блокировки
         mutex.unlock();
     }
 
@@ -124,7 +124,7 @@ public class Editor implements ActionListener {
 
 
     // Уведомляет всех наблюдателей о текущем тексте в текстовой области.
-    private void notifyObservers() {
+    public void notifyObservers() {
         try {
             acquireLock();
             String text = textArea.getText();  // Получение текста из текстовой области
@@ -156,14 +156,14 @@ public class Editor implements ActionListener {
     }
 
     // Метод для установки команд действий для пунктов меню
-    private void setActionCommands(JMenuItem... items) {
+    public void setActionCommands(JMenuItem... items) {
         for (JMenuItem item : items) {
             item.setActionCommand(item.getText());
         }
     }
 
     // Метод для добавления слушателей действий для пунктов меню
-    private void addActionListeners(JMenuItem... items) {
+    public void addActionListeners(JMenuItem... items) {
         for (JMenuItem item : items) {
             item.addActionListener(this);
         }
@@ -174,7 +174,7 @@ public class Editor implements ActionListener {
         String actionCommand = e.getActionCommand();  // Получение команды действия
 
         // Создание цепочки ответственности для обработки команд действий
-        ActionHandler handlerChain = new NewFileHandler(new OpenFileHandler(new SaveFileHandler(new SaveAsFileHandler(new CloseHandler(new ForwardHandler(new BackHandler(null)))))));
+        ActionHandler handlerChain = new NewFileHandler(this, new OpenFileHandler(this, new SaveFileHandler(this, new SaveAsFileHandler(this, new CloseHandler(this, new ForwardHandler(this, new BackHandler(this, null)))))));
         handlerChain.handleRequest(actionCommand);  // Обработка команды действия
 
         // Вызов метода логирования действий через внедренный аспект
@@ -183,231 +183,4 @@ public class Editor implements ActionListener {
         System.out.println("Action performed: " + actionCommand);
     }
 
-    interface ActionHandler {  // Интерфейс для обработчиков команд действий
-        void handleRequest(String actionCommand);
-    }
-
-    // Обработчик для команды "New"
-    class NewFileHandler implements ActionHandler {
-        private ActionHandler next;  // Ссылка на следующий обработчик в цепочке
-
-        NewFileHandler(ActionHandler next) {
-            this.next = next;  // Инициализация следующего обработчика
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("New")) {
-                new Thread(() -> {  // Создание нового потока для обработки команды
-                    try {
-                        acquireLock();  // Захват блокировки
-                        textArea.setText("");  // Очистка текстовой области
-                        openedFile = null;  // Сброс открытого файла
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();  // Обработка исключения
-                    } finally {
-                        releaseLock();  // Освобождение блокировки
-                    }
-                }).start();  // Запуск потока
-            } else {
-                next.handleRequest(actionCommand);  // Передача команды следующему обработчику в цепочке
-            }
-        }
-    }
-
-    // Обработчик для команды "Open"
-    class OpenFileHandler implements ActionHandler {
-        private ActionHandler next;
-
-        OpenFileHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Open")) {
-                JFileChooser fileChooser = new JFileChooser();  // Создание диалогового окна
-                int returnValue = fileChooser.showOpenDialog(frame);  // Отображение диалогового окна
-
-                if (returnValue == JFileChooser.APPROVE_OPTION) {  // Проверка, был ли файл выбран
-                    File selectedFile = fileChooser.getSelectedFile();  // Получение выбранного файла
-
-                    // Чтение файла в отдельном потоке
-                    new Thread(() -> {
-                        try {
-                            acquireLock();
-                            openedFile = selectedFile;  // Установка открытого файла
-
-                            BufferedReader reader = new BufferedReader(new FileReader(selectedFile));  // BufferedReader для чтения файла
-                            StringBuilder content = new StringBuilder();  //StringBuilder для накопления содержимого файла
-                            String line;
-                            while ((line = reader.readLine()) != null) {  // Чтение файла построчно
-                                content.append(line).append("\n");  // Добавление строки в StringBuilder
-                            }
-                            reader.close();  // Закрытие файла
-
-                            // Обновление текстовой области в главном потоке
-                            SwingUtilities.invokeLater(() -> textArea.setText(content.toString()));  // Установка текста в текстовую область
-                        } catch (IOException | InterruptedException ex) {
-                            ex.printStackTrace();
-                        } finally {
-                            releaseLock();
-                        }
-                    }).start();
-                }
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-    }
-
-    class SaveFileHandler implements ActionHandler {
-        private ActionHandler next;
-
-        SaveFileHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Save")) {
-                new Thread(() -> {  // Создание нового потока для обработки команды сохранения файла
-                    try {
-                        acquireLock();
-                        saveFile();  // Вызов метода сохранения файла
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    } finally {
-                        releaseLock();
-                    }
-                }).start();
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-
-        private void saveFile() {
-            if (openedFile != null) {  // Проверка, открыт ли файл
-                try {
-                    FileWriter writer = new FileWriter(openedFile);  // Создание FileWriter для записи в файл
-                    writer.write(textArea.getText());  // Запись содержимого текстовой области в файл
-                    writer.close();  // Закрытие файла
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            } else {
-                JFileChooser fileChooser = new JFileChooser();  // Создание диалогового окна
-                int returnValue = fileChooser.showSaveDialog(frame);  // Отображение диалогового окна
-
-                if (returnValue == JFileChooser.APPROVE_OPTION) {  // Проверка, был ли файл выбран
-                    File selectedFile = fileChooser.getSelectedFile();  // Получение выбранного файла
-                    openedFile = selectedFile;  // Установка открытого файла
-
-                    try {
-                        FileWriter writer = new FileWriter(selectedFile);  // FileWriter для записи в файл
-                        writer.write(textArea.getText());  // Запись содержимого текстовой области в файл
-                        writer.close();  // Закрытие файла
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
-        }
-    }
-
-    class SaveAsFileHandler implements ActionHandler {
-        private ActionHandler next;
-
-        SaveAsFileHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Save as")) {
-                new Thread(() -> {  // Создание нового потока
-                    try {
-                        acquireLock();
-                        JFileChooser fileChooser = new JFileChooser();  // Создание диалогового окна
-                        int returnValue = fileChooser.showSaveDialog(frame);  // Отображение диалогового окна и получение результата
-
-                        if (returnValue == JFileChooser.APPROVE_OPTION) {  // Проверка, был ли файл выбран
-                            File selectedFile = fileChooser.getSelectedFile();  // Получение выбранного файла
-                            openedFile = selectedFile;  // Установка открытого файла
-
-                            try {
-                                FileWriter writer = new FileWriter(selectedFile);  // FileWriter для записи в файл
-                                writer.write(textArea.getText());  // Запись содержимого текстовой области в файл
-                                writer.close();  // Закрытие файла
-                            } catch (IOException ex) {
-                                ex.printStackTrace();
-                            }
-                        }
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    } finally {
-                        releaseLock();
-                    }
-                }).start();
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-    }
-
-    class CloseHandler implements ActionHandler {
-        private ActionHandler next;
-
-        CloseHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Close")) {
-                new Thread(() -> {  // Создание нового потока
-                    try {
-                        acquireLock();
-                        frame.dispose();  // Закрытие окна приложения
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    } finally {
-                        releaseLock();
-                    }
-                }).start();
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-    }
-
-    class ForwardHandler implements ActionHandler {
-        private ActionHandler next;
-
-        ForwardHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Previous")) {
-                previousState = textArea.getText();  // Сохранение предыдущего состояния текстовой области
-                SwingUtilities.invokeLater(() -> undoManager.undo());  // Выполнение операции отмены
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-    }
-
-    class BackHandler implements ActionHandler {
-        private ActionHandler next;
-
-        BackHandler(ActionHandler next) {
-            this.next = next;
-        }
-
-        public void handleRequest(String actionCommand) {
-            if (actionCommand.equals("Following")) {
-                if (previousState != null) {
-                    textArea.setText(previousState);  // Установка предыдущего состояния текстовой области
-                }
-            } else {
-                next.handleRequest(actionCommand);
-            }
-        }
-    }
 }
