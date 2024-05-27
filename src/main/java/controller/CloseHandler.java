@@ -13,12 +13,12 @@ class CloseHandler implements ActionHandler {
         if (actionCommand.equals("Close")) {
             new Thread(() -> {  // Создание нового потока
                 try {
-                    editor.acquireLock();
+                    editor.readWriteLock.writeLock();
                     editor.frame.dispose();  // Закрытие окна приложения
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
                 } finally {
-                    editor.releaseLock();
+                    editor.readWriteLock.writeUnlock();
                 }
             }).start();
         } else {

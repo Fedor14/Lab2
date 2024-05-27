@@ -18,12 +18,12 @@ class SaveFileHandler implements ActionHandler {
         if (actionCommand.equals("Save")) {
             new Thread(() -> {  // Создание нового потока для обработки команды сохранения файла
                 try {
-                    editor.acquireLock();
+                    editor.readWriteLock.writeLock();
                     saveFile();  // Вызов метода сохранения файла
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
                 } finally {
-                    editor.releaseLock();
+                    editor.readWriteLock.writeUnlock();
                 }
             }).start();
         } else {

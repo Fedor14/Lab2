@@ -14,13 +14,13 @@ class NewFileHandler implements ActionHandler {
         if (actionCommand.equals("New")) {
             new Thread(() -> {  // Создание нового потока для обработки команды
                 try {
-                    editor.acquireLock();  // Захват блокировки
+                    editor.readWriteLock.writeLock();  // Захват блокировки
                     editor.textArea.setText("");  // Очистка текстовой области
                     editor.openedFile = null;  // Сброс открытого файла
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();  // Обработка исключения
                 } finally {
-                    editor.releaseLock();  // Освобождение блокировки
+                    editor.readWriteLock.writeUnlock();  // Освобождение блокировки
                 }
             }).start();  // Запуск потока
         } else {

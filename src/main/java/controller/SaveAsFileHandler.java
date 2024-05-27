@@ -18,7 +18,7 @@ class SaveAsFileHandler implements ActionHandler {
         if (actionCommand.equals("Save as")) {
             new Thread(() -> {  // Создание нового потока
                 try {
-                    editor.acquireLock();
+                    editor.readWriteLock.writeLock();
                     JFileChooser fileChooser = new JFileChooser();  // Создание диалогового окна
                     int returnValue = fileChooser.showSaveDialog(editor.frame);  // Отображение диалогового окна и получение результата
 
@@ -37,7 +37,7 @@ class SaveAsFileHandler implements ActionHandler {
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
                 } finally {
-                    editor.releaseLock();
+                    editor.readWriteLock.writeUnlock();
                 }
             }).start();
         } else {

@@ -27,7 +27,7 @@ class OpenFileHandler implements ActionHandler {
                 // Чтение файла в отдельном потоке
                 new Thread(() -> {
                     try {
-                        editor.acquireLock();
+                        editor.readWriteLock.writeLock();
                         editor.openedFile = selectedFile;  // Установка открытого файла
 
                         BufferedReader reader = new BufferedReader(new FileReader(selectedFile));  // BufferedReader для чтения файла
@@ -43,7 +43,7 @@ class OpenFileHandler implements ActionHandler {
                     } catch (IOException | InterruptedException ex) {
                         ex.printStackTrace();
                     } finally {
-                        editor.releaseLock();
+                        editor.readWriteLock.writeUnlock();
                     }
                 }).start();
             }

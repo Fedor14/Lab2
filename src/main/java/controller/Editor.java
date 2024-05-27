@@ -35,15 +35,7 @@ public class Editor implements ActionListener {
     @Autowired
     public LoggingAspect loggingAspect;  // Логирования действий
 
-    public final SimpleMutex mutex = new SimpleMutex();  // Мьютекс для синхронизации доступа
-
-    public void acquireLock() throws InterruptedException {  // Метод для получения блокировки
-        mutex.lock();
-    }
-
-    public void releaseLock() {  // Метод для освобождения блокировки
-        mutex.unlock();
-    }
+    public final ReadWriteLock readWriteLock = new ReadWriteLock();
 
     @Autowired
     public Editor(EditorUI editorUI, UndoManager undoManager, LoggingAspect loggingAspect) {
@@ -113,12 +105,12 @@ public class Editor implements ActionListener {
     // Добавляет нового наблюдателя
     public void addObserver(EditorObserver observer) {
         try {
-            acquireLock();  // Захват блокировки
+            readWriteLock.writeLock();  // Захват блокировки
             observers.add(observer);  // Добавление нового наблюдателя в список
         } catch (InterruptedException e) {  // Обработка исключения при возникновении ошибки во время захвата блокировки
             e.printStackTrace();  // Вывод стека вызовов для отладки
         } finally {
-            releaseLock();  // Освобождение блокировки
+            readWriteLock.writeUnlock();  // Освобождение блокировки
         }
     }
 
@@ -126,7 +118,7 @@ public class Editor implements ActionListener {
     // Уведомляет всех наблюдателей о текущем тексте в текстовой области.
     public void notifyObservers() {
         try {
-            acquireLock();
+            readWriteLock.readLock();
             String text = textArea.getText();  // Получение текста из текстовой области
             for (EditorObserver observer : observers) {  // Перебор всех наблюдателей
                 observer.update(text);  // Уведомление каждого наблюдателя о новом тексте
@@ -134,14 +126,14 @@ public class Editor implements ActionListener {
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            releaseLock();
+            readWriteLock.readUnlock();
         }
     }
 
     // Устанавливает новый текст в текстовой области.
     public void setText(String text) {
         try {
-            acquireLock();
+            readWriteLock.writeLock();
             isUpdating = true;  // Установка флага обновления текста
             try {
                 textArea.setText(text);  // Установка нового текста в текстовую область
@@ -151,7 +143,7 @@ public class Editor implements ActionListener {
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            releaseLock();
+            readWriteLock.writeUnlock();
         }
     }
 
